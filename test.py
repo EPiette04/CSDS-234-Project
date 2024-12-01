@@ -35,8 +35,8 @@ for name, path in file_paths.items():
         print(f"Error loading {name} dataset: {e}")
 
 # Save the DataFrames to disk using pickle for future use
-with open('dataframes.pkl', 'wb') as f:
-    pickle.dump(dataframes, f)
+#with open('dataframes.pkl', 'wb') as f:
+    #pickle.dump(dataframes, f)
 
 # To load the DataFrames back into memory in the future
 # with open('dataframes.pkl', 'rb') as f:
