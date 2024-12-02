@@ -1,46 +1,76 @@
-import json
-import pandas as pd
-import pickle
+import sqlite3
 
-# Function to load a JSON file into a DataFrame
-def load_json_to_dataframe(file_path):
-    data = []
-    with open(file_path, "r", encoding="utf-8") as file:
-        for line in file:
-            data.append(json.loads(line))  # Parse each JSON object separately
-    return pd.DataFrame(data)
+# Function to query POIs based on input criteria
+def query_pois(poi_type, keywords, filters, k=5):
+    # Connect to the SQLite database (same folder as the script)
+    conn = sqlite3.connect('yelp_data.db')
+    cursor = conn.cursor()
 
-# List of JSON file paths
-file_paths = {
-    "business": "yelp_academic_dataset_business.json",
-    "review": "yelp_academic_dataset_review.json",
-    "user": "yelp_academic_dataset_user.json",
-    "checkin": "yelp_academic_dataset_checkin.json",
-    "tip": "yelp_academic_dataset_tip.json",
+    # Base query to search for POIs, first checking for the poi_type
+    query = '''
+    SELECT business_id, name, stars, review_count, categories, city, address, latitude, longitude, attributes
+    FROM business
+    WHERE categories LIKE ?
+    '''
+    
+    # Parameters for the poi_type (check for the type in the categories)
+    params = [f"%{poi_type}%"]
+
+    # Keyword filter for categories
+    keyword_filters = []
+    for keyword in keywords:
+        keyword_filters.append("categories LIKE ?")  # Partial match for each keyword
+    
+    # Combine keyword filters with 'OR'
+    if keywords:
+        query += " AND (" + " OR ".join(keyword_filters) + ")"
+        params.extend([f"%{keyword}%" for keyword in keywords])
+
+    # Add other filters (e.g., rating, review count, attributes) if provided
+    for attr, value in filters.items():
+        if attr == "attributes":
+            # Special case for attributes: search inside JSON
+            for key, val in value.items():
+                query += f' AND json_extract(attributes, "$.{key}") = ?'
+                params.append(val)
+        else:
+            if isinstance(value, str):
+                query += f' AND {attr} LIKE ?'
+                params.append(f"%{value}%")
+            else:
+                operator = value[0]  # The operator e.g., '=', '>=', '>'
+                value = value[1]  # The actual value
+                query += f' AND {attr} {operator} ?'
+                params.append(value)
+    
+    # Order by rating and review count, descending
+    query += '''
+    ORDER BY stars DESC, review_count DESC
+    LIMIT ?
+    '''
+    params.append(k)
+
+    # Execute the query
+    cursor.execute(query, tuple(params))
+    results = cursor.fetchall()
+    
+    # Close the connection
+    conn.close()
+    
+    return results
+
+# Example usage:
+poi_type = 'Bars'  # E.g., restaurant, museum
+keywords = []  # Categories or other keywords
+filters = {
+    'stars': ('>=', 4), 
+    'review_count': ('>', 100),
+    'city': 'Franklin',
+      # Filter by attribute in JSON
 }
+top_k = 5  # Number of results to return
 
-# Dictionary to store DataFrames
-dataframes = {}
-
-# Load each file and display the first few rows
-for name, path in file_paths.items():
-    try:
-        print(f"\nLoading {name} dataset from {path}...")
-        df = load_json_to_dataframe(path)  # Load JSON file into a DataFrame
-        dataframes[name] = df  # Store DataFrame in the dictionary
-        print(f"First few rows of {name} dataset:")
-        print(df.head())  # Display the first few rows
-        print(f"Columns in {name} dataset: {df.columns.tolist()}\n")
-    except Exception as e:
-        print(f"Error loading {name} dataset: {e}")
-
-# Save the DataFrames to disk using pickle for future use
-#with open('dataframes.pkl', 'wb') as f:
-    #pickle.dump(dataframes, f)
-
-# To load the DataFrames back into memory in the future
-# with open('dataframes.pkl', 'rb') as f:
-#     dataframes = pickle.load(f)
-
-# Now you have the datasets loaded into `dataframes` dictionary
-# Access each dataset using its name, e.g., dataframes['business'], dataframes['review']
+# Query and print the top-k results
+top_pois = query_pois(poi_type, keywords, filters, top_k)
+for poi in top_pois:
+    print(poi)

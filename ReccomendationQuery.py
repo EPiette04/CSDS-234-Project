@@ -5,18 +5,27 @@ def query_pois(poi_type, keywords, filters, k=5):
     # Connect to the SQLite database (same folder as the script)
     conn = sqlite3.connect('yelp_data.db')
     cursor = conn.cursor()
-    
-    # Base query
-    query = f'''
+
+    # Base query to search for POIs, first checking for the poi_type
+    query = '''
     SELECT business_id, name, stars, review_count, categories, city, address, latitude, longitude
     FROM business
     WHERE categories LIKE ?
     '''
     
-    # Add keyword-based filter to the query
-    keyword_filter = f"%{poi_type}%"  # Match the type in categories
-    params = [keyword_filter]
+    # Parameters for the poi_type (check for the type in the categories)
+    params = [f"%{poi_type}%"]
+
+    # Keyword filter for categories
+    keyword_filters = []
+    for keyword in keywords:
+        keyword_filters.append("categories LIKE ?")  # Partial match for each keyword
     
+    # Combine keyword filters with 'OR'
+    if keywords:
+        query += " AND (" + " OR ".join(keyword_filters) + ")"
+        params.extend([f"%{keyword}%" for keyword in keywords])
+
     # Add other filters (e.g., rating, review count) if provided
     for attr, value in filters.items():
         if isinstance(value, str):
@@ -34,7 +43,7 @@ def query_pois(poi_type, keywords, filters, k=5):
     LIMIT ?
     '''
     params.append(k)
-    
+
     # Execute the query
     cursor.execute(query, tuple(params))
     results = cursor.fetchall()
@@ -45,9 +54,9 @@ def query_pois(poi_type, keywords, filters, k=5):
     return results
 
 # Example usage:
-poi_type = 'restaurant'  # E.g., restaurant, museum
-keywords = {'French', 'Italian'}  # Categories or other keywords
-filters = {'stars': ('>=', 4), 'review_count': ('>', 100)}  # Filters like rating, review count
+poi_type = 'Restaurant'  # E.g., restaurant, museum
+keywords = []  # Categories or other keywords
+filters = {'stars': ('>=', 3.5), 'review_count': ('>=', 50), 'city': 'Franklin'}  # Filters like rating, review count
 top_k = 5  # Number of results to return
 
 # Query and print the top-k results
