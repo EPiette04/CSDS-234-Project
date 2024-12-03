@@ -4,7 +4,7 @@ import json
 # Function to query POIs based on input criteria
 def query_pois(poi_type, keywords, filters, k=5):
     # Connect to the SQLite database (same folder as the script)
-    conn = sqlite3.connect('yelp_data_test7.db')
+    conn = sqlite3.connect('yelp_data_test5.db')
     cursor = conn.cursor()
 
     # Check the stored attributes in the database (optional for debugging)
@@ -38,25 +38,19 @@ def query_pois(poi_type, keywords, filters, k=5):
         if attr == "attributes":
             # Special case for attributes: search inside JSON
             for key, val in value.items():
-                # Handle BusinessParking or other nested attributes with string-based JSON
+                # Check if the key contains nested keys (e.g., BusinessParking.lot)
                 if '.' in key:
-                    # Replace single quotes with double quotes for valid JSON
+                    # Use json_each to handle nested attributes
                     query += f'''
                     AND EXISTS (
-                        SELECT 1 FROM json_each(replace(attributes, "'", '"'))
-                        WHERE json_extract(replace(attributes, "'", '"'), "$.{key}") = ?
+                        SELECT 1 FROM json_each(attributes)
+                        WHERE json_extract(attributes, "$.{key}") = ?
                     )
                     '''
                 else:
                     # Handle non-nested attributes
-                    query += f' AND json_extract(replace(attributes, "'", '"'), "$.{key}") = ?'
-                # Normalize True/False to string "True"/"False"
-                if val.lower() == 'true':
-                    params.append('True')
-                elif val.lower() == 'false':
-                    params.append('False')
-                else:
-                    params.append(val)
+                    query += f' AND json_extract(attributes, "$.{key}") = ?'
+                params.append(val)
         else:
             if isinstance(value, str):
                 query += f' AND {attr} LIKE ?'
@@ -93,8 +87,8 @@ keywords = []  # Categories or other keywords
 filters = {
     'stars': ('>=', 2), 
     'review_count': ('>', 20),
-    #'attributes': {'BikeParking': 'False'},
-    'attributes': {'BusinessParking.lot': 'True'}  # Adjust based on the correct key and value
+    #'attributes': {'BikeParking': 'False'},  # Filter for businesses with 'BikeParking' set to 'False'
+    'attributes': {'BusinessParking.lot': 'False'}  # Filter for businesses with 'BusinessParking.lot' set to 'False'
 }
 top_k = 5  # Number of results to return
 

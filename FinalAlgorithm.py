@@ -4,18 +4,12 @@ import json
 # Function to query POIs based on input criteria
 def query_pois(poi_type, keywords, filters, k=5):
     # Connect to the SQLite database (same folder as the script)
-    conn = sqlite3.connect('yelp_data_test7.db')
+    conn = sqlite3.connect('FinalDatabase.db')
     cursor = conn.cursor()
-
-    # Check the stored attributes in the database (optional for debugging)
-    cursor.execute('SELECT attributes FROM business LIMIT 10')
-    rows = cursor.fetchall()
-    for row in rows:
-        print(row[0])  # Prints the 'attributes' column in JSON format
-
+    
     # Base query to search for POIs, first checking for the poi_type
     query = '''
-    SELECT business_id, name, stars, review_count, categories, city, address 
+    SELECT name, stars, review_count, categories, city, address 
     FROM business
     WHERE categories LIKE ?
     '''
@@ -38,25 +32,9 @@ def query_pois(poi_type, keywords, filters, k=5):
         if attr == "attributes":
             # Special case for attributes: search inside JSON
             for key, val in value.items():
-                # Handle BusinessParking or other nested attributes with string-based JSON
-                if '.' in key:
-                    # Replace single quotes with double quotes for valid JSON
-                    query += f'''
-                    AND EXISTS (
-                        SELECT 1 FROM json_each(replace(attributes, "'", '"'))
-                        WHERE json_extract(replace(attributes, "'", '"'), "$.{key}") = ?
-                    )
-                    '''
-                else:
-                    # Handle non-nested attributes
-                    query += f' AND json_extract(replace(attributes, "'", '"'), "$.{key}") = ?'
-                # Normalize True/False to string "True"/"False"
-                if val.lower() == 'true':
-                    params.append('True')
-                elif val.lower() == 'false':
-                    params.append('False')
-                else:
-                    params.append(val)
+                # Ensure that the query looks for nested keys correctly
+                query += f' AND json_extract(attributes, "$.{key}") = ?'
+                params.append(val)
         else:
             if isinstance(value, str):
                 query += f' AND {attr} LIKE ?'
@@ -74,10 +52,6 @@ def query_pois(poi_type, keywords, filters, k=5):
     '''
     params.append(k)
 
-    # Debugging: Print query and parameters
-    print(f"Query: {query}")
-    print(f"Params: {params}")
-
     # Execute the query
     cursor.execute(query, tuple(params))
     results = cursor.fetchall()
@@ -89,12 +63,13 @@ def query_pois(poi_type, keywords, filters, k=5):
 
 # Example usage:
 poi_type = 'Restaurant'  # E.g., type of business (restaurant, museum, etc.)
-keywords = []  # Categories or other keywords
+keywords = ['Chinese']  # Categories or other keywords
 filters = {
     'stars': ('>=', 2), 
     'review_count': ('>', 20),
-    #'attributes': {'BikeParking': 'False'},
-    'attributes': {'BusinessParking.lot': 'True'}  # Adjust based on the correct key and value
+    'attributes': {'RestaurantsDelivery': 'True'}, 
+    'state': ('=', 'ID')
+    #'attributes': {'BusinessParking.lot': 'False'}  # Filter for businesses with 'BikeParking' set to True
 }
 top_k = 5  # Number of results to return
 
