@@ -3,7 +3,7 @@ import sqlite3
 # Function to query POIs based on input criteria
 def query_pois(poi_type, keywords, filters, k=5):
     # Connect to the SQLite database (same folder as the script)
-    conn = sqlite3.connect('yelp_data_test.db')
+    conn = sqlite3.connect('yelp_data.db')
     cursor = conn.cursor()
 
     # Base query to search for POIs, first checking for the poi_type

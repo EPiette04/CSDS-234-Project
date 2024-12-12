@@ -3,7 +3,7 @@ import json
 
 # Function to identify rows with malformed JSON in the 'attributes' column
 def find_malformed_json_rows():
-    conn = sqlite3.connect('yelp_data.db')
+    conn = sqlite3.connect('FinalDatabase.db')
     cursor = conn.cursor()
 
     # Query to fetch all the rows and their 'attributes' column
